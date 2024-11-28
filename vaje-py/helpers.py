@@ -1,6 +1,70 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import math
 
-# Naloga 2
+# Naloga 1. Zveza med Bernsteinovo in potenčno bazo
+
+def power2bernstein(p: np.ndarray):
+	"""
+	Opis:
+		power2bernstein pretvori polinom, predstavljen s koeficienti v
+		potenčni bazi, v polinom, predstavljen v Bernsteinovi bazi
+
+	Definicija:
+		b = power2bernstein(p)
+
+	Vhodni podatek:
+		p	seznam koeficientov dolžine n+1, ki po vrsti pripadajo razvoju
+			polinoma stopnje n v potenčni bazi od x^n do 1
+
+	Izhodni podatek:
+		b 	seznam koeficientov dolžine n+1, ki po vrsti pripadajo razvoju
+			polinoma stopnje n v Bernsteinovi bazi od 0-tega do n-tega
+			Bernsteinovega baznega polinoma
+	"""	
+
+	N = len(p)
+	n = N-1
+	b = np.zeros(N)
+
+	for i in range(N):
+		for j in range(i, N):
+			b[j] = b[j] + math.comb(j,i)/math.comb(n,i) * p[n-i]
+
+	return b
+
+
+def bernstein2power(b: np.ndarray):
+	"""
+	Opis:
+		bernstein2power pretvori polinom, predstavljen s koeficienti v
+		bernsteinovi bazi, v polinom, predstavljen v potenčni bazi
+
+	Definicija:
+		p = bernstein2power(b)
+
+	Vhodni podatek:
+		b 	seznam koeficientov dolžine n+1, ki po vrsti pripadajo razvoju
+			polinoma stopnje n v Bernsteinovi bazi od 0-tega do n-tega
+			Bernsteinovega baznega polinoma
+
+	Izhodni podatek:
+		p 	seznam koeficientov dolžine n+1, ki po vrsti pripadajo razvoju
+			polinoma stopnje n v potenčni bazi od x^n do 1
+	"""
+
+	N = len(b)
+	n = N-1
+	p = np.zeros(N)
+
+	for i in range(N):
+		for j in range(i, N):
+			p[n-j] = p[n-j] + (-1)**(i+j) * math.comb(n, j) * math.comb(j, i) * b[i]
+	
+	return p
+
+# Naloga 2. De Casteljaujev postopek
+
 def decasteljau_basic(b, t):
 	N = len(b)
 
@@ -40,22 +104,14 @@ def decasteljau(B: np.ndarray, t: float | np.ndarray):
 	if len(B.shape) > 2:
 		raise ValueError("b mora biti 1D ali 2D numpy array")
 
-	t = np.array(t)
-	ta = np.array([t]).flatten() # poskrbimo, da je t 1D numpy array
+	t = np.array([t]).flatten() # poskrbimo, da je t 1D numpy array
 
-	D = np.zeros((len(ta), dim, N, N)) * np.nan
+	D = np.zeros((len(t), dim, N, N)) * np.nan
 
 	D[:,:,:,0] = B.T
 
 	for r in range(1, N):
-		D[:,:,:N-r,r] = ((1-ta)*D[:,:,:N-r,r-1].T + ta*D[:,:,1:N-r+1,r-1].T).T
-
-	
-	if dim == 1:
-		D = D[:,0,:,:]
-	
-	if len(t.shape) == 0:
-		D = D[0]
+		D[:,:,:N-r,r] = ((1-t)*D[:,:,:N-r,r-1].T + t*D[:,:,1:N-r+1,r-1].T).T
 
 	return D
 
@@ -80,8 +136,152 @@ def bezier(B, t):
 
 	return decasteljau(B, t)[:,:,0,-1]
 
+def plotbezier(B: np.ndarray, t: np.ndarray, bezier_color: None | str = None, control_color = 'gray', controls=True):
+	P = bezier(B, t)
+
+	if P.shape[1] == 1:
+		if controls: plt.plot(np.linspace(0,1,len(B)), B, 'o-', color=control_color, linewidth=1, alpha=0.6)
+		plt.plot(t, P, '-', color=bezier_color, linewidth=2)
+	if P.shape[1] == 2:
+		if controls: plt.plot(B[:,0], B[:,1], 'o-', color=control_color, linewidth=1, alpha=0.6)
+		plt.plot(P[:,0], P[:,1], '-', color=bezier_color, linewidth=2)
+	if P.shape[1] == 3:
+		ax = plt.figure().add_subplot(projection="3d")
+		if controls: ax.plot(B[:,0], B[:,1], B[:,2], 'o-', color=control_color, linewidth=1, alpha=0.6)
+		ax.plot(P[:,0], P[:,1], P[:,2], '-', color=bezier_color, linewidth=2)
 
 
+# Naloga 3. Odvodi Bezierjeve krivulje
+
+def deljenadif(r, b, i):
+	"""
+	Izračuna r-to deljeno diferenco b_i, kjer je b seznam (vektorjev)
+	"""
+	if r == 0:
+		return b[i]
+	else:
+		return deljenadif(r-1, b, i+1) - deljenadif(r-1, b, i)
+	
+def bezierder(B, r, t):
+	"""
+		Opis:
+			bezierder vrne točke na krivulji, ki predstavlja odvod dane
+			Bezierjeve krivulje
+
+		Definicija:
+			db = bezierder(B,r,t)
+
+		Vhodni podatki:
+			B 	matrika kontrolnih točk Bezierjeve krivulje, v kateri vsaka
+				vrstica predstavlja eno kontrolno točko,
+			r 	stopnja odvoda, ki ga računamo,
+			t 	seznam parameterov, pri katerih računamo odvod
+
+		Izhodni podatek:
+			db 	matrika, v kateri vsaka vrstica predstavlja točko r-tega
+				odvoda pri istoležnem parametru iz seznama t
+
+			dB 	matrika, v kateri vsaka vrstica predstavlja kontrolno točko
+				r-tega odvoda
+	"""
+	B = np.array([[-2/3,-4/5],[1/3,1/5],[0,0],[-1/3,1/5],[2/3,-4/5]])
+	N, d = B.shape
+	n = N-1
+
+	dB = np.zeros((N-r, d))
+	for i in range(N-r):
+		dB[i] = math.factorial(n)/math.factorial(n-r) * deljenadif(r, B, i)
+
+	db = bezier(dB, t)
+
+	return db, dB
+
+# Naloga 4. Opis krožnice z Bezierjevimi krivuljami
+
+def bezierarc(fi, m):
+	"""
+	Opis:
+		bezierarc izračuna kontrole točke Bezierjeve krivulje, ki
+		predstavlja interpolacijo krožnega loka po izbrani metodi
+
+	Definicija:
+		B = bezierarc(fi,m)
+
+	Vhodna podatka:
+		fi kot, ki določa krozni lok v območju (-fi,fi),
+		m metoda interpolacije:
+		1 = kvadratični G1 interpolant,
+		2 = kubični C1 interpolant,
+		3 = kubični G1 interpolant s C0 interpolacijo v srednji točki
+
+	Izhodni podatek:
+		B tabela velikosti 3 x 2 ali 4 x 2, v kateri vsaka vrstica
+		predstavlja kontrolno točko Bezierjeve krivulje
+	"""
+
+	if m == 1: # kvadratični G1 interpolant
+		B = np.zeros((3,2))
+		B[0] = [np.cos(fi), -np.sin(fi)]
+		B[1] = [1/np.cos(fi), 0]
+		B[2] = [np.cos(fi), np.sin(fi)]
+		return B
+	
+	if m == 2: # kubični C1 interpolant
+		B = np.zeros((4,2))
+		B[0] = [np.cos(fi), -np.sin(fi)]
+		B[1] = [np.cos(fi)+1/3*np.sin(fi),-np.sin(fi)+1/3*np.cos(fi)]
+		B[2] = [np.cos(fi)+1/3*np.sin(fi),np.sin(fi)-1/3*np.cos(fi)]
+		B[3] = [np.cos(fi), np.sin(fi)]
+		return B
+	
+	if m == 3: # kubični G1 interpolant s C0 interpolacijo v srednji točki
+		B = np.zeros((4,2))
+		B[0] = [np.cos(fi), -np.sin(fi)]
+		B[1] = 1/3*np.array([4-np.cos(fi),4/np.tan(fi)-4/np.sin(fi)+np.sin(fi)])
+		B[2] = 1/3*np.array([4-np.cos(fi),-4/np.tan(fi)+4/np.sin(fi)-np.sin(fi)])
+		B[3] = [np.cos(fi), np.sin(fi)]
+		return B
+
+	raise ValueError("m mora biti 1, 2 ali 3")
+
+# Naloga 5. Subdivizija Bezierjeve krivulje
+
+def beziersub(B, t, k):
+	"""
+	Opis:
+		beziersub izvede subdivizijo Bezierjeve krivulje
+		
+	Definicija:
+		BS = beziersub(B,t)
+		
+	Vhodni podatki:
+		B 	matrika kontrolnih točk Bezierjeve krivulje, v kateri
+			vsaka vrstica predstavlja eno kontrolno točko,
+		t 	parameter subdivizije Bezierjeve krivulje
+		k 	parameter ki pove kolikokrat razpolovimo krivuljo
+		
+	Izhodni podatek:
+		BS 	celica, ki vsebuje kontrolne točke dveh krivulj, ki jih
+			dobimo s subdivizijo prvotne Bezierjeve krivulje
+	"""
+
+	BS = [B]
+
+	for _ in range(k):
+		new_BS = []
+		for l in range(len(BS)):
+			D = decasteljau(BS[l], t)
+			BL = D[0,:,0,:].T
+			BR = np.diagonal(np.fliplr(D[0, :]), axis1=1, axis2=2).T[::-1]
+			new_BS += [BL, BR]
+		BS = new_BS
+	return BS
+
+
+# Naloga 6. Višanje stopnje Bezierjeve krivulje
+
+def bezierelf(B, k):
+	pass
 
 # Naloga 7
 def alphaparam(P: np.ndarray, a: float):
