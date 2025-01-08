@@ -304,9 +304,21 @@ def beziersub(B, t, k):
 
 # Naloga 6. Višanje stopnje Bezierjeve krivulje
 
-def bezierelf(B, k):
-	pass
+def bezierelv(B, k):
+	Be = B
+	for j in range(k):
+		n, m = Be.shape
+		Bn = np.zeros((n+1, m))
 
+		Bn[0] = Be[0]
+
+		for i in range(1,n):
+			Bn[i] = (1-i/n) * Be[i] + i/n * Be[i-1]
+		
+		Bn[n] = Be[n-1]
+
+		Be = Bn
+	return Be
 # Naloga 7
 def alphaparam(P: np.ndarray, a: float):
 	"""
