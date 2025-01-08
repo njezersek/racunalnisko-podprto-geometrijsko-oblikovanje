@@ -2,6 +2,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
+def matlab_to_numpy(matrix_str: str):
+    """
+    Converts a MATLAB-style matrix string to a NumPy array.
+    
+    Args:
+        matrix_str (str): Matrix in MATLAB syntax (e.g., "[1 2; 3 4]").
+    
+    Returns:
+        numpy.ndarray: Corresponding NumPy array.
+    """
+    # Remove MATLAB-style brackets
+    matrix_str = matrix_str.strip("[]")
+    
+    # Split rows and columns
+    rows = matrix_str.split(';')
+    parsed_rows = []
+    
+    for row in rows:
+        # Convert row string to a list of floats/integers
+        parsed_rows.append([float(num) if '.' in num else int(num) for num in row.split()])
+    
+    # Convert the list of lists to a NumPy array
+    return np.array(parsed_rows)
+
 # Naloga 1. Zveza med Bernsteinovo in potenčno bazo
 
 def power2bernstein(p: np.ndarray):
@@ -362,3 +386,63 @@ def beziercubspline(u, D):
 		B[l-1][3] = B[l][0] = d(u, l) / a * B[l-1][2] + d(u, l-1) / a * B[l][1]
 
 	return B
+
+# Naloga 9. Racionalne Bezierjeve krivulje in Farinove točke
+
+def rbezier(b: np.ndarray, w: np.ndarray, t: np.ndarray):
+	"""
+	Opis:
+		rbezier vrne točke na racionalni Bezierovi krivulji, izračunane z
+		de Casteljaujevim postopkom za racionalne krivulje
+		
+	Definicija:
+		b = rbezier(b,w,t)
+
+	Vhod:
+		b 	matrika velikosti n+1 x d, v kateri vsaka vrstica predstavlja
+			eno kontrolno točko racionalne Bezierjeve krivulje stopnje n
+		v 	prostoru dimenzije d,
+		w 	seznam uteži racionalne Bezierjeve krivulje,
+		t 	seznam parametrov dolžine N, za katere se računajo točke na
+			racionalni Bezierjevi krivulji
+		
+	Izhod:
+		 	matrika velikosti N x d, v kateri i-ta vrstica predstavlja
+			točko na racionalni Bezierjevi krivulji pri i-tem parametru
+			iz seznama t
+	"""
+
+	N, dim = b.shape
+
+	B = np.zeros((len(t), dim, N, N)) # T, D, N, R
+	W = np.zeros((len(t), 1, N, N)) # T, 1, N, R
+
+	B[:,:,:,0] = b.T
+	W[:,:,:,0] = w.T
+
+	for r in range(1, N):
+		W[:,:,:N-r,r] = ((1-t)*W[:,:,:N-r,r-1].T + t*W[:,:,1:N-r+1,r-1].T).T
+		B[:,:,:N-r,r] = (1/W[:,:,:N-r,r].T * ((1-t) * W[:,:,:N-r,r-1].T * B[:,:,:N-r,r-1].T + t * W[:,:,1:N-r+1,r-1].T*B[:,:,1:N-r+1,r-1].T)).T
+
+	return B[:, :, 0, -1]
+
+
+def plotrbezier(B: np.ndarray, w: np.ndarray, t: np.ndarray, bezier_color: None | str = None, control_color = 'gray', controls=True):
+	P = rbezier(B, w, t)
+
+	if P.shape[1] == 1:
+		if controls: plt.plot(np.linspace(0,1,len(B)), B, 'o-', color=control_color, linewidth=1, alpha=0.6)
+		plt.plot(t, P, '-', color=bezier_color, linewidth=2)
+		plt.gca().set_aspect('equal')
+	if P.shape[1] == 2:
+		if controls: 
+			plt.plot(B[:,0], B[:,1], 'o-', color=control_color, linewidth=1, alpha=0.6)
+			q = w[:-1]/(w[:-1]+w[1:])*B[:-1] + w[1:]/(w[:-1]+w[1:])*B[1:] # Farinove točke
+			plt.plot(q[:,0], q[:,1], 'o', color='tab:blue', linewidth=1, alpha=0.6)
+		plt.plot(P[:,0], P[:,1], '-', color=bezier_color, linewidth=2)
+
+		plt.gca().set_aspect('equal')
+	if P.shape[1] == 3:
+		ax = plt.figure().add_subplot(projection="3d")
+		if controls: ax.plot(B[:,0], B[:,1], B[:,2], 'o-', color=control_color, linewidth=1, alpha=0.6)
+		ax.plot(P[:,0], P[:,1], P[:,2], '-', color=bezier_color, linewidth=2)
